@@ -42,11 +42,12 @@ export const jidDecode = (jid: string | undefined): FullJid | undefined => {
 }
 
 /** is the jid a user */
-export const areJidsSameUser = (jid1: string | undefined, jid2: string | undefined) => jidDecode(jid1)?.user === jidDecode(jid2)?.user
+export const areJidsSameUser = (jid1: string | undefined, jid2: string | undefined) =>
+	jidDecode(jid1)?.user === jidDecode(jid2)?.user
 /** is the jid Meta IA */
 export const isJidMetaIa = (jid: string | undefined) => jid?.endsWith('@bot')
 /** is the jid a PN user */
-export const isJidUser = (jid: string | undefined) => (jid?.endsWith('@s.whatsapp.net'))
+export const isJidUser = (jid: string | undefined) => jid?.endsWith('@s.whatsapp.net')
 /** is the jid a PN user */
 export const isPnUser = (jid: string | undefined) => jid?.endsWith('@s.whatsapp.net')
 /** is the jid a LID */
@@ -75,7 +76,7 @@ export const jidNormalizedUser = (jid: string | undefined) => {
 	}
 
 	const { user, server } = result
-	return jidEncode(user, server === 'c.us' ? 's.whatsapp.net' : server as JidServer)
+	return jidEncode(user, server === 'c.us' ? 's.whatsapp.net' : (server as JidServer))
 }
 
 export const transferDevice = (fromJid: string, toJid: string) => {

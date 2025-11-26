@@ -32,7 +32,7 @@ import {
 	makeNoiseHandler,
 	printQRIfNecessaryListener,
 	promiseTimeout,
-	promiseTimeoutEnhanced,
+	promiseTimeoutEnhanced
 } from '../Utils'
 import {
 	assertNodeErrorFree,
@@ -67,11 +67,10 @@ export const makeSocket = (config: SocketConfig) => {
 		defaultQueryTimeoutMs,
 		transactionOpts,
 		qrTimeout,
-		makeSignalRepository,
+		makeSignalRepository
 	} = config
 
 	const url = typeof waWebSocketUrl === 'string' ? new URL(waWebSocketUrl) : waWebSocketUrl
-
 
 	if (config.mobile || url.protocol === 'tcp:') {
 		throw new Boom('Mobile API is not supported anymore', { statusCode: DisconnectReason.loggedOut })
@@ -115,17 +114,14 @@ export const makeSocket = (config: SocketConfig) => {
 		}
 
 		const bytes = noise.encodeFrame(data)
-		await promiseTimeout<void>(
-			connectTimeoutMs,
-			async (resolve, reject) => {
-				try {
-					await sendPromise.call(ws, bytes)
-					resolve()
-				} catch (error) {
-					reject(error)
-				}
+		await promiseTimeout<void>(connectTimeoutMs, async (resolve, reject) => {
+			try {
+				await sendPromise.call(ws, bytes)
+				resolve()
+			} catch (error) {
+				reject(error)
 			}
-		)
+		})
 	}
 
 	const sendNode = (frame: BinaryNode) => {
@@ -138,13 +134,10 @@ export const makeSocket = (config: SocketConfig) => {
 	}
 
 	const onUnexpectedError = (err: Error | Boom, msg: string) => {
-		logger.error(
-			{ err },
-			`unexpected error in '${msg}'`
-		)
+		logger.error({ err }, `unexpected error in '${msg}'`)
 	}
 
-	const awaitNextMessage = async<T>(sendMsg?: Uint8Array) => {
+	const awaitNextMessage = async <T>(sendMsg?: Uint8Array) => {
 		if (!ws.isOpen) {
 			throw new Boom('Connection Closed', {
 				statusCode: DisconnectReason.connectionClosed
@@ -160,12 +153,11 @@ export const makeSocket = (config: SocketConfig) => {
 			ws.on('frame', onOpen)
 			ws.on('close', onClose)
 			ws.on('error', onClose)
+		}).finally(() => {
+			ws.off('frame', onOpen)
+			ws.off('close', onClose)
+			ws.off('error', onClose)
 		})
-			.finally(() => {
-				ws.off('frame', onOpen)
-				ws.off('close', onClose)
-				ws.off('error', onClose)
-			})
 
 		if (sendMsg) {
 			sendRawMessage(sendMsg).catch(onClose!)
@@ -179,22 +171,20 @@ export const makeSocket = (config: SocketConfig) => {
 	 * @param msgId the message tag to await
 	 * @param timeoutMs timeout after which the promise will reject
 	 */
-	const waitForMessage = async<T>(msgId: string, timeoutMs = defaultQueryTimeoutMs) => {
+	const waitForMessage = async <T>(msgId: string, timeoutMs = defaultQueryTimeoutMs) => {
 		let onRecv: (json) => void
 		let onErr: (err) => void
 		try {
-			return await promiseTimeout<T>(timeoutMs,
-				(resolve, reject) => {
-					onRecv = resolve
-					onErr = err => {
-						reject(err || new Boom('Connection Closed', { statusCode: DisconnectReason.connectionClosed }))
-					}
+			return await promiseTimeout<T>(timeoutMs, (resolve, reject) => {
+				onRecv = resolve
+				onErr = err => {
+					reject(err || new Boom('Connection Closed', { statusCode: DisconnectReason.connectionClosed }))
+				}
 
-					ws.on(`TAG:${msgId}`, onRecv)
-					ws.on('close', onErr)
-					ws.off('error', onErr)
-				},
-			)
+				ws.on(`TAG:${msgId}`, onRecv)
+				ws.on('close', onErr)
+				ws.off('error', onErr)
+			})
 		} finally {
 			ws.off(`TAG:${msgId}`, onRecv!)
 			ws.off('close', onErr!)
@@ -208,7 +198,7 @@ export const makeSocket = (config: SocketConfig) => {
 	 * @param operationType the type of operation for adaptive timeout
 	 * @param customTimeoutMs custom timeout, overrides adaptive timeout
 	 */
-	const waitForMessageEnhanced = async<T>(
+	const waitForMessageEnhanced = async <T>(
 		msgId: string,
 		operationType: 'group-metadata' | 'send-message' | 'query' | 'default' = 'default',
 		customTimeoutMs?: number
@@ -216,7 +206,8 @@ export const makeSocket = (config: SocketConfig) => {
 		let onRecv: (json) => void
 		let onErr: (err) => void
 		try {
-			return await promiseTimeoutEnhanced<T>(operationType,
+			return await promiseTimeoutEnhanced<T>(
+				operationType,
 				(resolve, reject) => {
 					onRecv = resolve
 					onErr = err => {
@@ -302,15 +293,13 @@ export const makeSocket = (config: SocketConfig) => {
 			logger.trace({ node }, 'logging in...')
 		}
 
-		const payloadEnc: Buffer = noise.encrypt(
-			proto.ClientPayload.encode(node).finish()
-		)
+		const payloadEnc: Buffer = noise.encrypt(proto.ClientPayload.encode(node).finish())
 		await sendRawMessage(
 			proto.HandshakeMessage.encode({
 				clientFinish: {
 					static: keyEnc,
-					payload: payloadEnc,
-				},
+					payload: payloadEnc
+				}
 			}).finish()
 		)
 		noise.finishInit()
@@ -326,9 +315,7 @@ export const makeSocket = (config: SocketConfig) => {
 				type: 'get',
 				to: S_WHATSAPP_NET
 			},
-			content: [
-				{ tag: 'count', attrs: {} }
-			]
+			content: [{ tag: 'count', attrs: {} }]
 		})
 		const countChild = getBinaryNodeChild(result, 'count')
 		return +countChild!.attrs.value
@@ -396,7 +383,8 @@ export const makeSocket = (config: SocketConfig) => {
 
 				uploadPreKeysPromise = Promise.race([
 					uploadLogic(),
-					new Promise<void>((_, reject) => setTimeout(() => reject(new Boom('Pre-key upload timeout', { statusCode: 408 })), UPLOAD_TIMEOUT)
+					new Promise<void>((_, reject) =>
+						setTimeout(() => reject(new Boom('Pre-key upload timeout', { statusCode: 408 })), UPLOAD_TIMEOUT)
 					)
 				])
 
@@ -431,7 +419,10 @@ export const makeSocket = (config: SocketConfig) => {
 			const { exists: currentPreKeyExists, currentPreKeyId } = await verifyCurrentPreKeyExists()
 
 			logger.debug({ preKeyCount }, `${preKeyCount} pre-keys found on server`)
-			logger.debug({ currentPreKeyId, currentPreKeyExists }, `Current prekey ID: ${currentPreKeyId}, exists in storage: ${currentPreKeyExists}`)
+			logger.debug(
+				{ currentPreKeyId, currentPreKeyExists },
+				`Current prekey ID: ${currentPreKeyId}, exists in storage: ${currentPreKeyExists}`
+			)
 
 			const lowServerCount = preKeyCount <= MIN_PREKEY_COUNT
 			const missingCurrentPreKey = !currentPreKeyExists && currentPreKeyId > 0
@@ -451,7 +442,10 @@ export const makeSocket = (config: SocketConfig) => {
 				logger.debug({ reasons }, `Uploading PreKeys due to: ${reasons.join(', ')}`)
 				await uploadPreKeys()
 			} else {
-				logger.debug({ preKeyCount, currentPreKeyId }, `PreKey validation passed - Server: ${preKeyCount}, Current prekey ${currentPreKeyId} exists`)
+				logger.debug(
+					{ preKeyCount, currentPreKeyId },
+					`PreKey validation passed - Server: ${preKeyCount}, Current prekey ${currentPreKeyId} exists`
+				)
 			}
 		} catch (error) {
 			logger.error({ error }, 'Failed to check/upload pre-keys during initialization')
@@ -500,10 +494,7 @@ export const makeSocket = (config: SocketConfig) => {
 		}
 
 		closed = true
-		logger.trace(
-			{ trace: error?.stack },
-			error ? 'connection errored' : 'connection closed'
-		)
+		logger.trace({ trace: error?.stack }, error ? 'connection errored' : 'connection closed')
 
 		clearInterval(keepAliveReq)
 		clearTimeout(qrTimer)
@@ -516,7 +507,7 @@ export const makeSocket = (config: SocketConfig) => {
 		if (!ws.isClosed && !ws.isClosing) {
 			try {
 				ws.close()
-			} catch { }
+			} catch {}
 		}
 
 		ev.emit('connection.update', {
@@ -546,12 +537,11 @@ export const makeSocket = (config: SocketConfig) => {
 			ws.on('open', onOpen)
 			ws.on('close', onClose)
 			ws.on('error', onClose)
+		}).finally(() => {
+			ws.off('open', onOpen)
+			ws.off('close', onClose)
+			ws.off('error', onClose)
 		})
-			.finally(() => {
-				ws.off('open', onOpen)
-				ws.off('close', onClose)
-				ws.off('error', onClose)
-			})
 	}
 
 	const startKeepAliveRequest = () => {
@@ -571,34 +561,37 @@ export const makeSocket = (config: SocketConfig) => {
 			if (diff > keepAliveIntervalMs + 5000) {
 				end(new Boom('Connection was lost', { statusCode: DisconnectReason.connectionLost }))
 			} else if (ws.isOpen) {
-				query(
-					{
-						tag: 'iq',
-						attrs: {
-							id: generateMessageTag(),
-							to: S_WHATSAPP_NET,
-							type: 'get',
-							xmlns: 'w:p',
-						},
-						content: [{ tag: 'ping', attrs: {} }]
-					}
-				)
+				query({
+					tag: 'iq',
+					attrs: {
+						id: generateMessageTag(),
+						to: S_WHATSAPP_NET,
+						type: 'get',
+						xmlns: 'w:p'
+					},
+					content: [{ tag: 'ping', attrs: {} }]
+				})
 					.then(() => {
 						consecutiveFailures = 0
 					})
 					.catch(err => {
 						consecutiveFailures++
-						logger.error({
-							trace: err.stack,
-							consecutiveFailures,
-							maxFailures: MAX_FAILURES
-						}, 'error in sending keep alive')
+						logger.error(
+							{
+								trace: err.stack,
+								consecutiveFailures,
+								maxFailures: MAX_FAILURES
+							},
+							'error in sending keep alive'
+						)
 
 						if (consecutiveFailures >= MAX_FAILURES) {
 							logger.warn({}, 'Too many keep-alive failures, ending connection')
-							end(new Boom('Keep-alive failures exceeded threshold', {
-								statusCode: DisconnectReason.connectionLost
-							}))
+							end(
+								new Boom('Keep-alive failures exceeded threshold', {
+									statusCode: DisconnectReason.connectionLost
+								})
+							)
 						}
 					})
 			} else {
@@ -607,19 +600,16 @@ export const makeSocket = (config: SocketConfig) => {
 		}, keepAliveIntervalMs))
 	}
 
-	const sendPassiveIq = (tag: 'passive' | 'active') => (
+	const sendPassiveIq = (tag: 'passive' | 'active') =>
 		query({
 			tag: 'iq',
 			attrs: {
 				to: S_WHATSAPP_NET,
 				xmlns: 'passive',
-				type: 'set',
+				type: 'set'
 			},
-			content: [
-				{ tag, attrs: {} }
-			]
+			content: [{ tag, attrs: {} }]
 		})
-	)
 
 	const logout = async (msg?: string) => {
 		const jid = authState.creds.me?.id
@@ -747,14 +737,16 @@ export const makeSocket = (config: SocketConfig) => {
 	})
 	ws.on('error', mapWebSocketError(end))
 	ws.on('close', () => end(new Boom('Connection Terminated', { statusCode: DisconnectReason.connectionClosed })))
-	ws.on('CB:xmlstreamend', () => end(new Boom('Connection Terminated by Server', { statusCode: DisconnectReason.connectionClosed })))
+	ws.on('CB:xmlstreamend', () =>
+		end(new Boom('Connection Terminated by Server', { statusCode: DisconnectReason.connectionClosed }))
+	)
 	ws.on('CB:iq,type:set,pair-device', async (stanza: BinaryNode) => {
 		const iq: BinaryNode = {
 			tag: 'iq',
 			attrs: {
 				to: S_WHATSAPP_NET,
 				type: 'result',
-				id: stanza.attrs.id,
+				id: stanza.attrs.id
 			}
 		}
 		await sendNode(iq)
@@ -913,10 +905,9 @@ export const makeSocket = (config: SocketConfig) => {
 			sendNode({
 				tag: 'presence',
 				attrs: { name: name! }
+			}).catch(err => {
+				logger.error({ trace: err.stack }, 'error in sending presence update on name change')
 			})
-				.catch(err => {
-					logger.error({ trace: err.stack }, 'error in sending presence update on name change')
-				})
 		}
 
 		Object.assign(creds, update)
@@ -950,7 +941,7 @@ export const makeSocket = (config: SocketConfig) => {
 		uploadPreKeysToServerIfRequired,
 		requestPairingCode,
 		waitForConnectionUpdate: bindWaitForConnectionUpdate(ev),
-		sendWAMBuffer,
+		sendWAMBuffer
 	}
 }
 
@@ -960,12 +951,7 @@ export const makeSocket = (config: SocketConfig) => {
  * */
 function mapWebSocketError(handler: (err: Error) => void) {
 	return (error: Error) => {
-		handler(
-			new Boom(
-				`WebSocket Error (${error?.message})`,
-				{ statusCode: getCodeFromWSError(error), data: error }
-			)
-		)
+		handler(new Boom(`WebSocket Error (${error?.message})`, { statusCode: getCodeFromWSError(error), data: error }))
 	}
 }
 

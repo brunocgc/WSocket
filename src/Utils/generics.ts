@@ -186,12 +186,15 @@ export async function promiseTimeout<T>(
 /**
  * Adaptive timeout configuration for different operation types
  */
-export const getAdaptiveTimeout = (operationType: 'group-metadata' | 'send-message' | 'query' | 'default', defaultTimeout?: number): number => {
+export const getAdaptiveTimeout = (
+	operationType: 'group-metadata' | 'send-message' | 'query' | 'default',
+	defaultTimeout?: number
+): number => {
 	const timeouts = {
 		'group-metadata': 90_000, // 90 seconds for group metadata operations
 		'send-message': 60_000, // 60 seconds for sending messages
-		'query': 45_000, // 45 seconds for general queries
-		'default': 120_000 // 2 minutes default
+		query: 45_000, // 45 seconds for general queries
+		default: 120_000 // 2 minutes default
 	}
 
 	return defaultTimeout || timeouts[operationType] || timeouts.default
@@ -215,21 +218,22 @@ export async function promiseTimeoutEnhanced<T>(
 	const { delay, cancel } = delayCancellable(timeoutMs)
 	const p = new Promise<T>((resolve, reject) => {
 		delay
-			.then(() => reject(
-				new Boom(`Operation '${operationType}' timed out after ${timeoutMs}ms`, {
-					statusCode: DisconnectReason.timedOut,
-					data: {
-						stack,
-						operationType,
-						timeoutMs
-					}
-				})
-			))
+			.then(() =>
+				reject(
+					new Boom(`Operation '${operationType}' timed out after ${timeoutMs}ms`, {
+						statusCode: DisconnectReason.timedOut,
+						data: {
+							stack,
+							operationType,
+							timeoutMs
+						}
+					})
+				)
+			)
 			.catch(err => reject(err))
 
 		promise(resolve, reject)
-	})
-		.finally(cancel)
+	}).finally(cancel)
 	return p
 }
 

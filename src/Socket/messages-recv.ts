@@ -61,7 +61,6 @@ import {
 import { extractGroupMetadata } from './groups'
 import { makeMessagesSocket } from './messages-send'
 
-
 export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	const { logger, retryRequestDelayMs, maxMsgRetryCount, getMessage, shouldIgnoreJid } = config
 	const sock = makeMessagesSocket(config)
@@ -227,8 +226,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				receipt.attrs.participant = node.attrs.participant
 			}
 
-			if (retryCount <=2 && forceIncludeKeys) {
-				await assertSessions([jidNormalizedUser(author)], true);
+			if (retryCount <= 2 && forceIncludeKeys) {
+				await assertSessions([jidNormalizedUser(author)], true)
 				const { update, preKeys } = await getNextPreKeys(authState, 1)
 
 				const [keyId] = Object.keys(preKeys)
@@ -560,7 +559,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		}
 	}
 
-	const handlePrivacyTokenNotification = async(node: BinaryNode) => {
+	const handlePrivacyTokenNotification = async (node: BinaryNode) => {
 		const tokensNode: BinaryNode | undefined = getBinaryNodeChild(node, 'tokens')
 		const from: string = jidNormalizedUser(node.attrs.from)
 		let lidForPN: string | null = null
@@ -653,14 +652,13 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		for (const [i, msg] of msgs.entries()) {
 			if (msg) {
 				updateSendMessageAgainCount(ids[i], participant)
-				const msgRelayOpts: MessageRelayOptions = { messageId: ids[i], isretry:true }
-					msgRelayOpts.participant = {
-						jid: participant,
-						count: +retryNode.attrs.count
-
+				const msgRelayOpts: MessageRelayOptions = { messageId: ids[i], isretry: true }
+				msgRelayOpts.participant = {
+					jid: participant,
+					count: +retryNode.attrs.count
 				}
 
-				await relayMessage(key.remoteJid!, msg, msgRelayOpts,)
+				await relayMessage(key.remoteJid!, msg, msgRelayOpts)
 			} else {
 				logger.debug({ jid: key.remoteJid, id: ids[i] }, 'recv retry request, but message not available')
 			}
@@ -980,15 +978,12 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		const callId = infoChild.attrs['call-id']
 		const from = infoChild.attrs.from || infoChild.attrs['call-creator']
 		status = getCallStatusFromNode(infoChild)
-		if(isLidUser(from) && infoChild.tag==='relaylatency')
-		{
-			const verify = callOfferCache.get(callId);
-			if(!verify)
-			{
-				status = 'offer';
-				callOfferCache.set(callId,true);
+		if (isLidUser(from) && infoChild.tag === 'relaylatency') {
+			const verify = callOfferCache.get(callId)
+			if (!verify) {
+				status = 'offer'
+				callOfferCache.set(callId, true)
 			}
-
 		}
 		const call: WACallEvent = {
 			chatId: attrs.from,
@@ -1017,9 +1012,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		// delete data once call has ended
 		if (status === 'reject' || status === 'accept' || status === 'timeout' || status === 'terminate') {
 			callOfferCache.del(call.id)
-			if(isLidUser(from))
-			{
-			 callOfferCache.del(from)
+			if (isLidUser(from)) {
+				callOfferCache.del(from)
 			}
 		}
 
@@ -1294,40 +1288,40 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				break
 		}
 	}
-		const handlePresenceUpdate = ({ tag, attrs, content }: BinaryNode) => {
-			let presence: PresenceData | undefined
-			const jid = attrs.from
-			const participant = attrs.participant || attrs.from
+	const handlePresenceUpdate = ({ tag, attrs, content }: BinaryNode) => {
+		let presence: PresenceData | undefined
+		const jid = attrs.from
+		const participant = attrs.participant || attrs.from
 
-			if (shouldIgnoreJid(jid)) {
-				return
-			}
-
-			if (tag === 'presence') {
-				presence = {
-					lastKnownPresence: attrs.type === 'unavailable' ? 'unavailable' : 'available',
-					lastSeen: attrs.last && attrs.last !== 'deny' ? +attrs.last : undefined
-				}
-			} else if (Array.isArray(content)) {
-				const [firstChild] = content
-				let type = firstChild.tag as WAPresence
-				if (type === 'paused') {
-					type = 'available'
-				}
-
-				if (firstChild.attrs?.media === 'audio') {
-					type = 'recording'
-				}
-
-				presence = { lastKnownPresence: type }
-			} else {
-				logger.error({ tag, attrs, content }, 'recv invalid presence node')
-			}
-
-			if (presence) {
-				ev.emit('presence.update', { id: jid, presences: { [participant]: presence } })
-			}
+		if (shouldIgnoreJid(jid)) {
+			return
 		}
+
+		if (tag === 'presence') {
+			presence = {
+				lastKnownPresence: attrs.type === 'unavailable' ? 'unavailable' : 'available',
+				lastSeen: attrs.last && attrs.last !== 'deny' ? +attrs.last : undefined
+			}
+		} else if (Array.isArray(content)) {
+			const [firstChild] = content
+			let type = firstChild.tag as WAPresence
+			if (type === 'paused') {
+				type = 'available'
+			}
+
+			if (firstChild.attrs?.media === 'audio') {
+				type = 'recording'
+			}
+
+			presence = { lastKnownPresence: type }
+		} else {
+			logger.error({ tag, attrs, content }, 'recv invalid presence node')
+		}
+
+		if (presence) {
+			ev.emit('presence.update', { id: jid, presences: { [participant]: presence } })
+		}
+	}
 
 	// recv a message
 	ws.on('CB:message', (node: BinaryNode) => {
