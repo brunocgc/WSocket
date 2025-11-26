@@ -31,7 +31,8 @@ import {
 	unixTimestampSeconds,
 	convertlidDevice,
 	getContentType,
-	encodeNewsletterMessage
+	encodeNewsletterMessage,
+	delay
 } from '../Utils'
 import { getUrlInfo } from '../Utils/link-preview'
 import {
@@ -40,9 +41,12 @@ import {
 	BinaryNodeAttributes,
 	getBinaryNodeChild,
 	getBinaryNodeChildren,
+	isHostedLidUser,
+	isHostedPnUser,
 	isJidGroup,
 	isJidUser,
 	isLidUser,
+	isPnUser,
 	jidDecode,
 	jidEncode,
 	jidNormalizedUser,
@@ -85,6 +89,11 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 	const lidCache = new NodeCache({
 		stdTTL: 3600, // 1 hour
+		useClones: false
+	})
+
+	const peerSessionsCache = new NodeCache({
+		stdTTL: DEFAULT_CACHE_TTLS.USER_DEVICES,
 		useClones: false
 	})
 
@@ -274,28 +283,104 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		}
 
 		if (jidsRequiringFetch.length) {
-			logger.debug({ jidsRequiringFetch }, 'fetching sessions')
-			const result = await query({
-				tag: 'iq',
-				attrs: {
-					xmlns: 'encrypt',
-					type: 'get',
-					to: S_WHATSAPP_NET
-				},
-				content: [
-					{
-						tag: 'key',
-						attrs: {},
-						content: jidsRequiringFetch.map(jid => ({
-							tag: 'user',
-							attrs: { jid }
-						}))
-					}
-				]
-			})
-			await parseAndInjectE2ESessions(result, signalRepository, lids, meid, melid)
+			const lidMappings = await signalRepository.getLIDMappingStore().getLIDsForPNs(
+				jidsRequiringFetch.filter(jid => !!isPnUser(jid) || !!isHostedPnUser(jid))
+			) || []
 
+			const wireJids: string[] = [
+				...jidsRequiringFetch.filter(jid => !!isLidUser(jid) || !!isHostedLidUser(jid)),
+				...lidMappings.map(a => a.lidUser)
+			]
+
+			// If no LID mappings found, use the original PN JIDs
+			const pnJidsWithoutLid = jidsRequiringFetch.filter(jid => {
+				if (!isPnUser(jid) && !isHostedPnUser(jid)) {
+					return false
+				}
+
+				const hasLidMapping = lidMappings.some(m => areJidsSameUser(m.pnUser, jid))
+				return !hasLidMapping
+			})
+
+			if (pnJidsWithoutLid.length > 0) {
+				logger.debug({ pnJidsWithoutLid }, 'No LID mapping found for some PNs, using PN JIDs directly')
+				wireJids.push(...pnJidsWithoutLid)
+			}
+
+			logger.debug({ jidsRequiringFetch, wireJids }, 'fetching sessions')			// Check if we already have cached sessions for these wire JIDs
+			const wireJidsToFetch: string[] = []
+			for (const wireJid of wireJids) {
+				const signalId: string = signalRepository.jidToSignalProtocolAddress(wireJid)
+				const hasCached: boolean = peerSessionsCache.get<boolean>(signalId) === true
+				if (!hasCached) {
+					wireJidsToFetch.push(wireJid)
+				} else {
+					logger.debug({ wireJid }, 'skipping fetch, session already cached')
+				}
+			}
+
+			if (wireJidsToFetch.length === 0) {
+				logger.debug({}, 'all sessions already cached, skipping fetch')
+				return didFetchNewSession
+			}
+
+			// Retry logic with exponential backoff for session fetching
+			let retries = 3
+			let result: BinaryNode | null = null
+			let lastError: Error | null = null
+
+			while (retries > 0 && !result) {
+				try {
+					result = await query({
+						tag: 'iq',
+						attrs: {
+							xmlns: 'encrypt',
+							type: 'get',
+							to: S_WHATSAPP_NET
+						},
+						content: [
+							{
+								tag: 'key',
+								attrs: {},
+								content: wireJidsToFetch.map(jid => {
+									const attrs: { [key: string]: string } = { jid }
+									if (force) {
+										attrs.reason = 'identity'
+									}
+
+									return { tag: 'user', attrs }
+								})
+							}
+						]
+					}, 150_000) // 150 seconds timeout
+					break
+				} catch (error) {
+					lastError = error as Error
+					retries--
+					if (retries > 0) {
+						const backoffDelay = (4 - retries) * 5000 // 5s, 10s, 15s
+						logger.warn(
+							{ error: error.message, retriesLeft: retries, backoffDelay },
+							'Failed to fetch sessions, retrying...'
+						)
+						await delay(backoffDelay)
+					}
+				}
+			}
+
+			if (!result) {
+				logger.error({ error: lastError?.message, jidsRequiringFetch }, 'Failed to fetch sessions after all retries')
+				throw lastError || new Boom('Failed to fetch sessions', { statusCode: 408 })
+			}
+
+			await parseAndInjectE2ESessions(result, signalRepository)
 			didFetchNewSession = true
+
+			// Cache fetched sessions using wire JIDs
+			for (const wireJid of wireJids) {
+				const signalId: string = signalRepository.jidToSignalProtocolAddress(wireJid)
+				peerSessionsCache.set(signalId, true)
+			}
 		}
 
 		return didFetchNewSession

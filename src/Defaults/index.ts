@@ -118,5 +118,6 @@ export const DEFAULT_CACHE_TTLS = {
 	USER_DEVICES: 5 * 60, // 5 minutes
 	LID_CACHE: 5 * 60, // 5 minutes
 	SESSION_MIGRATION_CACHE: 60 * 60, // 1 hour
-	SESSION_VALIDATION_CACHE: 60 * 60 // 1 hour
+	SESSION_VALIDATION_CACHE: 60 * 60, // 1 hour
+	PEER_SESSIONS: 5 * 60 // 5 minutes
 }

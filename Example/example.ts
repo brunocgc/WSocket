@@ -152,7 +152,7 @@ const startSock = async () => {
 
 							if (text == "!lid") {
 								try {
-									const lid = msg.key.senderLid || msg.key.remoteJid!
+									const lid = msg.key.sender_lid || msg.key.remoteJid!
 									const me = sock.user
 									await sendMessageWTyping({
 										text: `Enviado pelo ${jidNormalizedUser(lid)}\n\nSeu lid: ${jidNormalizedUser(lid)}\nMeu lid: ${jidNormalizedUser(me?.lid)}`
@@ -167,7 +167,7 @@ const startSock = async () => {
 
 							if (text == "!jid") {
 								try {
-									const jid = msg.key.senderPn || msg.key.remoteJid!
+									const jid = msg.key.sender_pn || msg.key.remoteJid!
 									const me = sock.user
 									await sendMessageWTyping({
 										text: `Enviado pelo ${jidNormalizedUser(jid)}\n\nSeu jid: ${jidNormalizedUser(jid)}\nMeu jid: ${jidNormalizedUser(me?.id)}`,
