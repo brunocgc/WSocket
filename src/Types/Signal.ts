@@ -1,4 +1,5 @@
 import { proto } from '../../WAProto'
+import { LIDMappingStore } from '../Signal/lid-mapping'
 
 type DecryptGroupSignalOpts = {
 	group: string
@@ -19,6 +20,12 @@ type DecryptSignalProtoOpts = {
 
 type EncryptMessageOpts = {
 	jid: string
+	data: Uint8Array
+}
+
+type EncryptMessageWithWireOpts = {
+	encryptionJid: string
+	wireJid: string
 	data: Uint8Array
 }
 
@@ -51,11 +58,18 @@ type E2ESessionOpts = {
 
 export type SignalRepository = {
 	decryptGroupMessage(opts: DecryptGroupSignalOpts): Promise<Uint8Array>
-	processSenderKeyDistributionMessage(opts: ProcessSenderKeyDistributionMessageOpts): Promise<void>
+	processSenderKeyDistributionMessage(
+		opts: ProcessSenderKeyDistributionMessageOpts
+	): Promise<void>
 	decryptMessage(opts: DecryptSignalProtoOpts): Promise<Uint8Array>
 	encryptMessage(opts: EncryptMessageOpts): Promise<{
 		type: 'pkmsg' | 'msg'
 		ciphertext: Uint8Array
+	}>
+	encryptMessageWithWire(opts: EncryptMessageWithWireOpts): Promise<{
+		type: 'pkmsg' | 'msg'
+		ciphertext: Uint8Array
+		wireJid: string
 	}>
 	encryptGroupMessage(opts: EncryptGroupMessageOpts): Promise<{
 		senderKeyDistributionMessage: Uint8Array
@@ -63,4 +77,10 @@ export type SignalRepository = {
 	}>
 	injectE2ESession(opts: E2ESessionOpts): Promise<void>
 	jidToSignalProtocolAddress(jid: string): string
+	storeLIDPNMapping(lid: string, pn: string): Promise<void>
+	getLIDMappingStore(): LIDMappingStore
+	migrateSession(fromJid: string, toJid: string): Promise<{ migrated: number; skipped: number; total: number }>
+	validateSession(jid: string): Promise<{ exists: boolean; reason?: string }>
+	deleteSession(jid: string): Promise<void>
+	destroy(): void
 }
