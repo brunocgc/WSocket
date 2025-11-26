@@ -791,6 +791,11 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	}
 
 	const handleMessage = async (node: BinaryNode) => {
+		const senderLid: string = node.attrs.from.includes('@lid') ? node.attrs.from : node.attrs.sender_lid || node.attrs.participant_lid
+		const pn: string = node.attrs.from.includes('@s.whatsapp.net') ? node.attrs.from : node.attrs.sender_pn || node.attrs.participant_pn
+		if (senderLid && pn) {
+			await signalRepository.getLIDMappingStore().storeLIDPNMapping(senderLid, pn)
+		}
 		if (shouldIgnoreJid(node.attrs.from) && node.attrs.from !== '@s.whatsapp.net') {
 			logger.debug({ key: node.attrs.key }, 'ignored message')
 			await sendMessageAck(node)
